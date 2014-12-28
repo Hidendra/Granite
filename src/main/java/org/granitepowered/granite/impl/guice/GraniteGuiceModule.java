@@ -39,7 +39,9 @@ import org.spongepowered.api.GameRegistry;
 import org.spongepowered.api.plugin.PluginContainer;
 import org.spongepowered.api.plugin.PluginManager;
 import org.spongepowered.api.service.config.ConfigDir;
+import org.spongepowered.api.service.config.DefaultConfig;
 import org.spongepowered.api.service.event.EventManager;
+import org.spongepowered.api.util.config.ConfigFile;
 
 import java.io.File;
 import java.lang.annotation.Annotation;
@@ -53,6 +55,7 @@ public class GraniteGuiceModule extends AbstractModule {
     protected void configure() {
         PluginScope pluginScope = new PluginScope();
 
+        DefaultConfig pluginConfig = new ConfigFileAnnotation(true);
         ConfigDir sharedConfigDir = new ConfigDirAnnotation(true);
         ConfigDir privateConfigDir = new ConfigDirAnnotation(false);
 
@@ -70,6 +73,7 @@ public class GraniteGuiceModule extends AbstractModule {
         bind(File.class).annotatedWith(sharedConfigDir).toProvider(GlobalPluginDataDirProvider.class).in(Scopes.SINGLETON);
         bind(File.class).annotatedWith(privateConfigDir).toProvider(PluginDataDirProvider.class).in(PluginScoped.class);
         bind(Logger.class).toProvider(PluginLoggerProvider.class).in(PluginScoped.class);
+        bind(ConfigFile.class).annotatedWith(pluginConfig).toProvider(PluginHoconConfigProvider.class).in(PluginScoped.class);
     }
 
     /**
@@ -118,6 +122,24 @@ public class GraniteGuiceModule extends AbstractModule {
 
     }
 
+    private static class PluginHoconConfigProvider implements Provider<ConfigFile> {
+
+        private final PluginContainer container;
+        private File configDir;
+
+        @Inject
+        public PluginHoconConfigProvider(PluginContainer container, @ConfigDir(sharedRoot = true) File configDir) {
+            this.container = container;
+            this.configDir = configDir;
+        }
+
+        @Override
+        public ConfigFile get() {
+            return ConfigFile.parseFile(new File(configDir, container.getId() + ".conf"));
+        }
+
+    }
+
     private static class GlobalPluginDataDirProvider implements Provider<File> {
 
         @Override
@@ -145,7 +167,7 @@ public class GraniteGuiceModule extends AbstractModule {
 
     private static class ConfigDirAnnotation implements ConfigDir {
 
-        private boolean isShared;
+        private final boolean isShared;
 
         public ConfigDirAnnotation(boolean isShared) {
             this.isShared = isShared;
@@ -181,5 +203,45 @@ public class GraniteGuiceModule extends AbstractModule {
         }
 
     }
+
+    private static class ConfigFileAnnotation implements DefaultConfig {
+
+        private final boolean shared;
+
+        public ConfigFileAnnotation(boolean isShared) {
+            this.shared = isShared;
+        }
+
+        @Override
+        public boolean sharedRoot() {
+            return shared;
+        }
+
+        @Override
+        public Class<? extends Annotation> annotationType() {
+            return DefaultConfig.class;
+        }
+
+        @Override
+        public boolean equals(Object o) {
+            if (this == o) {
+                return true;
+            }
+            if (o == null || !(o instanceof DefaultConfig)) {
+                return false;
+            }
+
+            DefaultConfig that = (DefaultConfig) o;
+
+            return sharedRoot() == that.sharedRoot();
+        }
+
+        @Override
+        public int hashCode() {
+            return (127 * "sharedRoot".hashCode()) ^ Boolean.valueOf(sharedRoot()).hashCode();
+        }
+
+    }
+
 
 }
