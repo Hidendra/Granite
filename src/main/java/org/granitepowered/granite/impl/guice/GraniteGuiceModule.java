@@ -32,6 +32,8 @@ import org.granitepowered.granite.impl.GraniteGameRegistry;
 import org.granitepowered.granite.impl.GraniteServer;
 import org.granitepowered.granite.impl.plugin.GranitePluginManager;
 import org.granitepowered.granite.impl.service.event.GraniteEventManager;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.spongepowered.api.Game;
 import org.spongepowered.api.GameRegistry;
 import org.spongepowered.api.plugin.PluginContainer;
@@ -67,6 +69,7 @@ public class GraniteGuiceModule extends AbstractModule {
         bind(PluginContainer.class).toProvider(PluginContainerProvider.class).in(PluginScoped.class);
         bind(File.class).annotatedWith(sharedConfigDir).toProvider(GlobalPluginDataDirProvider.class).in(Scopes.SINGLETON);
         bind(File.class).annotatedWith(privateConfigDir).toProvider(PluginDataDirProvider.class).in(PluginScoped.class);
+        bind(Logger.class).toProvider(PluginLoggerProvider.class).in(PluginScoped.class);
     }
 
     /**
@@ -95,6 +98,22 @@ public class GraniteGuiceModule extends AbstractModule {
         @Override
         public PluginContainer get() {
             return scope.getInstance(Key.get(PluginContainer.class));
+        }
+
+    }
+
+    private static class PluginLoggerProvider implements Provider<Logger> {
+
+        private final PluginContainer container;
+
+        @Inject
+        public PluginLoggerProvider(PluginContainer container) {
+            this.container = container;
+        }
+
+        @Override
+        public Logger get() {
+            return LoggerFactory.getLogger(container.getId());
         }
 
     }
