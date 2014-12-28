@@ -25,7 +25,6 @@ package org.granitepowered.granite.impl.guice;
 
 import com.google.inject.AbstractModule;
 import com.google.inject.Key;
-import com.google.inject.Provider;
 import com.google.inject.Scopes;
 
 import org.granitepowered.granite.Granite;
@@ -44,6 +43,7 @@ import java.io.File;
 import java.lang.annotation.Annotation;
 
 import javax.inject.Inject;
+import javax.inject.Provider;
 
 public class GraniteGuiceModule extends AbstractModule {
 
@@ -67,6 +67,61 @@ public class GraniteGuiceModule extends AbstractModule {
         bind(PluginContainer.class).toProvider(PluginContainerProvider.class).in(PluginScoped.class);
         bind(File.class).annotatedWith(sharedConfigDir).toProvider(GlobalPluginDataDirProvider.class).in(Scopes.SINGLETON);
         bind(File.class).annotatedWith(privateConfigDir).toProvider(PluginDataDirProvider.class).in(PluginScoped.class);
+    }
+
+    /**
+     * Provides GraniteServer. This is used instead of <code>to(GraniteServer.class)</code>
+     * because otherwise it would be immediately loaded by Guice and then class rewriting
+     * would fail.
+     */
+    private static class GraniteServerProvider implements Provider<Game> {
+
+        @Override
+        public Game get() {
+            return new GraniteServer();
+        }
+
+    }
+
+    private static class PluginContainerProvider implements Provider<PluginContainer> {
+
+        private final PluginScope scope;
+
+        @Inject
+        public PluginContainerProvider(PluginScope scope) {
+            this.scope = scope;
+        }
+
+        @Override
+        public PluginContainer get() {
+            return scope.getInstance(Key.get(PluginContainer.class));
+        }
+
+    }
+
+    private static class GlobalPluginDataDirProvider implements Provider<File> {
+
+        @Override
+        public File get() {
+            return Granite.getInstance().getServerConfig().getPluginDataDirectory();
+        }
+
+    }
+
+    private static class PluginDataDirProvider implements Provider<File> {
+
+        private final PluginContainer container;
+
+        @Inject
+        public PluginDataDirProvider(PluginContainer container) {
+            this.container = container;
+        }
+
+        @Override
+        public File get() {
+            return new File(Granite.getInstance().getServerConfig().getPluginDataDirectory(), container.getId() + "/");
+        }
+
     }
 
     private static class ConfigDirAnnotation implements ConfigDir {
@@ -106,56 +161,6 @@ public class GraniteGuiceModule extends AbstractModule {
             return (127 * "sharedRoot".hashCode()) ^ Boolean.valueOf(sharedRoot()).hashCode();
         }
 
-    }
-
-    /**
-     * Provides GraniteServer. This is used instead of <code>to(GraniteServer.class)</code>
-     * because otherwise, it would be immediately loaded by Guice and then class rewriting
-     * would fail.
-     */
-    private static class GraniteServerProvider implements Provider<Game> {
-        @Override
-        public Game get() {
-            return new GraniteServer();
-        }
-    }
-
-    private static class PluginContainerProvider implements Provider<PluginContainer> {
-
-        private final PluginScope scope;
-
-        @Inject
-        public PluginContainerProvider(PluginScope scope) {
-            this.scope = scope;
-        }
-
-        @Override
-        public PluginContainer get() {
-            return scope.getInstance(Key.get(PluginContainer.class));
-        }
-
-    }
-
-    private static class GlobalPluginDataDirProvider implements Provider<File> {
-        @Override
-        public File get() {
-            return Granite.getInstance().getServerConfig().getPluginDataDirectory();
-        }
-    }
-
-    private static class PluginDataDirProvider implements Provider<File> {
-
-        private final PluginContainer container;
-
-        @Inject
-        public PluginDataDirProvider(PluginContainer container) {
-            this.container = container;
-        }
-
-        @Override
-        public File get() {
-            return new File(Granite.getInstance().getServerConfig().getPluginDataDirectory(), container.getId() + "/");
-        }
     }
 
 }
